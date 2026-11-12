@@ -1,0 +1,15 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Uploaded runtime files (keep folder & .htaccess)
+uploads/attendance/*
+!uploads/attendance/.htaccess
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

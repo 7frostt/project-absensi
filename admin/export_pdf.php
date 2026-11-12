@@ -1,0 +1,212 @@
+<?php
+session_start();
+require '../config/database.php';
+require '../config/helpers.php';
+require '../config/security.php';
+date_default_timezone_set('Asia/Jakarta');
+
+enforce_admin_access();
+
+$bulan = isset($_GET['bulan']) ? sprintf("%02d", $_GET['bulan']) : date('m');
+$tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
+$jenis = isset($_GET['jenis']) ? $_GET['jenis'] : 'Semua';
+
+$jumlah_hari = cal_days_in_month(CAL_GREGORIAN, (int)$bulan, (int)$tahun);
+
+$stmt_holidays = $pdo->prepare("SELECT date, name FROM holidays WHERE MONTH(date) = ? AND YEAR(date) = ?");
+$stmt_holidays->execute([$bulan, $tahun]);
+$holidays_raw = $stmt_holidays->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$query_users = "SELECT * FROM users WHERE user_type != 'Admin'";
+$params_users = [];
+if ($jenis != 'Semua') {
+    $query_users .= " AND user_type = ?";
+    $params_users[] = $jenis;
+}
+$query_users .= " ORDER BY name ASC";
+$stmt_users = $pdo->prepare($query_users);
+$stmt_users->execute($params_users);
+$users = $stmt_users->fetchAll();
+
+$stmt_att = $pdo->prepare("SELECT *, DAY(date) AS tgl FROM attendance WHERE MONTH(date) = ? AND YEAR(date) = ?");
+$stmt_att->execute([$bulan, $tahun]);
+$attendance_data = [];
+$today_ymd = date('Y-m-d');
+$tol_izin  = izin_jam_toleransi($pdo);
+
+while ($row = $stmt_att->fetch()) {
+    // Aturan rekap ada di config/helpers.php (rekap_status):
+    // pending/ditolak tidak dihitung; izin jam dinilai Izin Jam / Terlambat / Alpa
+    $st = rekap_status($row, $today_ymd, $tol_izin);
+    if ($st !== null) {
+        $attendance_data[$row['user_id']][$row['tgl']] = $st;
+    }
+}
+
+$nama_bulan = [
+    '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
+    '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
+    '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+];
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Rekap_Absensi_<?= $nama_bulan[$bulan] ?>_<?= $tahun ?></title>
+    <style>
+        @page { size: A4 landscape; margin: 8mm; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9px; color: #333; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .header { text-align: center; margin-bottom: 10px; }
+        .header h2 { margin: 0; font-size: 14px; text-transform: uppercase; }
+        .header p { margin: 2px 0 0 0; font-size: 10px; font-weight: bold; color: #555; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
+        th, td { border: 1px solid #444; padding: 3px 1px; text-align: center; font-size: 8.5px; overflow: hidden; }
+        th { background-color: #f0f0f0; font-weight: bold; }
+        
+        .bg-libur-head { background-color: #ef4444 !important; color: #fff !important; }
+        .bg-h { background-color: #10b981 !important; color: #fff !important; font-weight: bold; }
+        .bg-t { background-color: #d63384 !important; color: #fff !important; font-weight: bold; }
+        .bg-ij { background-color: #fd7e14 !important; color: #fff !important; font-weight: bold; }
+        .bg-k { background-color: #17a2b8 !important; color: #fff !important; font-weight: bold; }
+        .bg-i { background-color: #0d6efd !important; color: #fff !important; font-weight: bold; }
+        .bg-c { background-color: #20c997 !important; color: #fff !important; font-weight: bold; }
+        .bg-s { background-color: #6f42c1 !important; color: #fff !important; font-weight: bold; }
+        .bg-a { background-color: #ef4444 !important; color: #fff !important; font-weight: bold; }
+        .bg-l { background-color: #212529 !important; color: #fff !important; font-weight: bold; }
+        .bg-dash { background-color: #64748b !important; color: #fff !important; font-weight: bold; }
+
+        .legend { margin-top: 10px; font-size: 8.5px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .legend-item { display: inline-block; padding: 2px 5px; border-radius: 3px; font-weight: bold; }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="header">
+        <h2>REKAP ABSENSI PKL, MAGANG & KARYAWAN</h2>
+        <p>PERIODE BULAN <?= strtoupper($nama_bulan[$bulan]) ?> TAHUN <?= $tahun ?></p>
+    </div>
+
+    <table>
+        <colgroup>
+            <col style="width: 25px;">   <!-- No -->
+            <col style="width: 120px;">  <!-- Nama -->
+            <col style="width: 22px;">   <!-- JK -->
+            <col style="width: 100px;">  <!-- Sekolah / Instansi -->
+            <col style="width: 90px;">   <!-- Jurusan / Divisi -->
+            <col style="width: 60px;">   <!-- Jenis -->
+            <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
+                <col style="width: 17px;"> <!-- Tanggal 1-31 -->
+            <?php endfor; ?>
+            <col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"> <!-- Total H,T,IJ,K,I,C,S,A -->
+        </colgroup>
+        <thead>
+            <tr>
+                <th rowspan="2">No</th>
+                <th rowspan="2" style="text-align: left; padding-left: 4px;">Nama</th>
+                <th rowspan="2">JK</th>
+                <th rowspan="2" style="text-align: left; padding-left: 4px;">Sekolah / Instansi</th>
+                <th rowspan="2" style="text-align: left; padding-left: 4px;">Jurusan / Divisi</th>
+                <th rowspan="2">Jenis</th>
+                <th colspan="<?= $jumlah_hari ?>"><?= strtoupper($nama_bulan[$bulan]) ?></th>
+                <th colspan="8">Total</th>
+            </tr>
+            <tr>
+                <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
+                    <?php 
+                    $tgl_str = sprintf("%s-%s-%02d", $tahun, $bulan, $d);
+                    $day_num = date('N', strtotime($tgl_str));
+                    $is_libur = ($day_num == 7 || isset($holidays_raw[$tgl_str]));
+                    ?>
+                    <th class="<?= $is_libur ? 'bg-libur-head' : '' ?>"><?= $d ?></th>
+                <?php endfor; ?>
+                <th class="bg-h">H</th>
+                <th class="bg-t">T</th>
+                <th class="bg-ij">I</th>
+                <th class="bg-k">K</th>
+                <th class="bg-i">I</th>
+                <th class="bg-c">C</th>
+                <th class="bg-s">S</th>
+                <th class="bg-a">A</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php $no = 1; foreach ($users as $u): ?>
+                <?php $tot_h = $tot_t = $tot_ij = $tot_k = $tot_i = $tot_c = $tot_s = $tot_a = 0; ?>
+                <tr>
+                    <td><?= $no++ ?></td>
+                    <td style="text-align: left; padding-left: 4px; font-weight: bold; text-transform: uppercase;"><?= strtoupper(htmlspecialchars($u['name'])) ?></td>
+                    <td><?= ($u['gender'] ?? '') === 'Laki-laki' ? 'L' : (($u['gender'] ?? '') === 'Perempuan' ? 'P' : '-') ?></td>
+                    <td style="text-align: left; padding-left: 4px;"><?= htmlspecialchars($u['institution'] ?: '-') ?></td>
+                    <td style="text-align: left; padding-left: 4px;"><?= htmlspecialchars($u['department'] ?: '-') ?></td>
+                    <td><?= htmlspecialchars($u['user_type']) ?></td>
+
+                    <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
+                        <?php 
+                        $tgl_str = sprintf("%s-%s-%02d", $tahun, $bulan, $d);
+                        $day_num = date('N', strtotime($tgl_str));
+                        $is_libur = ($day_num == 7 || isset($holidays_raw[$tgl_str]));
+                        $st = $attendance_data[$u['id']][$d] ?? null;
+
+                        if ($st == 'Hadir') {
+                            $tot_h++;
+                            echo '<td class="bg-h">H</td>';
+                        } elseif ($st == 'Terlambat') {
+                            $tot_t++;
+                            echo '<td class="bg-t">T</td>';
+                        } elseif ($st == 'Izin Jam') {
+                            $tot_ij++;
+                            echo '<td class="bg-ij">I</td>';
+                        } elseif ($st == 'Kunjungan') {
+                            $tot_k++;
+                            echo '<td class="bg-k">K</td>';
+                        } elseif (in_array($st, ['Izin', 'Izin Hari'])) {
+                            $tot_i++;
+                            echo '<td class="bg-i">I</td>';
+                        } elseif ($st == 'Cuti') {
+                            $tot_c++;
+                            echo '<td class="bg-c">C</td>';
+                        } elseif ($st == 'Sakit') {
+                            $tot_s++;
+                            echo '<td class="bg-s">S</td>';
+                        } elseif ($st == 'Alpa') {
+                            $tot_a++;
+                            echo '<td class="bg-a">A</td>';
+                        } else {
+                            if ($is_libur) {
+                                echo '<td class="bg-l">L</td>';
+                            } else {
+                                echo '<td style="color: #888;">-</td>';
+                            }
+                        }
+                        ?>
+                    <?php endfor; ?>
+
+                    <td style="font-weight: bold; background-color: #E7F8F2; color: #198754;"><?= $tot_h ?></td>
+                    <td style="font-weight: bold; background-color: #FBEBF3; color: #d63384;"><?= $tot_t ?></td>
+                    <td style="font-weight: bold; background-color: #FFF2E8; color: #fd7e14;"><?= $tot_ij ?></td>
+                    <td style="font-weight: bold; background-color: #E8F6F8; color: #17a2b8;"><?= $tot_k ?></td>
+                    <td style="font-weight: bold; background-color: #E7F1FF; color: #0d6efd;"><?= $tot_i ?></td>
+                    <td style="font-weight: bold; background-color: #E4F9F3; color: #14a085;"><?= $tot_c ?></td>
+                    <td style="font-weight: bold; background-color: #F1ECF9; color: #6f42c1;"><?= $tot_s ?></td>
+                    <td style="font-weight: bold; background-color: #FDECEC; color: #dc3545;"><?= $tot_a ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <div class="legend">
+        <span class="legend-item bg-h">H: Hadir</span>
+        <span class="legend-item bg-t">T: Terlambat</span>
+        <span class="legend-item bg-ij">I: Izin Jam</span>
+        <span class="legend-item bg-k">K: Kunjungan</span>
+        <span class="legend-item bg-i">I: Izin</span>
+        <span class="legend-item bg-c">C: Cuti</span>
+        <span class="legend-item bg-s">S: Sakit</span>
+        <span class="legend-item bg-a">A: Alpa/Ditolak</span>
+        <span class="legend-item bg-l">L: Libur</span>
+        <span class="legend-item bg-dash">-: Belum/Absen Kosong</span>
+        <span class="legend-item" style="background: #f0f0f0; border: 1px solid #bbb;"><b>JK:</b> Jenis Kelamin (<b>L</b> = Laki-laki, <b>P</b> = Perempuan)</span>
+    </div>
+</body>
+</html>
