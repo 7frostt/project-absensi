@@ -160,7 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             kembali('error', 'Fitur kunjungan dinas luar hanya diperuntukkan bagi karyawan.');
         }
 
-        if (!boleh_ajukan_baru($existing)) kembali('error', 'Anda sudah memiliki catatan absensi hari ini.');
+        if ($existing && $existing['status'] === 'Kunjungan') {
+            kembali('error', 'Anda sudah tercatat dalam tugas kunjungan dinas luar hari ini.');
+        }
 
         $instansi = bersihkan_keterangan($_POST['instansi_kunjungan'] ?? '');
         $alasan   = bersihkan_keterangan($_POST['description'] ?? '');
@@ -179,14 +181,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $description = "[Kunjungan: $instansi] " . $alasan;
 
         if ($existing) {
-            $stmt = $pdo->prepare("UPDATE attendance SET check_in = ?, status = 'Kunjungan', latitude = ?, longitude = ?, approval_status = 'Disetujui', description = ?, photo = ? WHERE id = ?");
-            $stmt->execute([$time_now, $lat, $lng, $description, $photo, $existing['id']]);
+            $stmt = $pdo->prepare("UPDATE attendance SET status = 'Kunjungan', latitude = IFNULL(?, latitude), longitude = IFNULL(?, longitude), approval_status = 'Disetujui', description = ?, photo = IFNULL(?, photo) WHERE id = ?");
+            $stmt->execute([$lat, $lng, $description, $photo, $existing['id']]);
+            logActivity($pdo, $user_id, "Memperbarui status ke kunjungan dinas luar ke $instansi" . ($lat && $lng ? " ($lat, $lng)" : ""));
+            kembali('pesan', 'Status kehadiran berhasil diperbarui menjadi Kunjungan Dinas Luar (Dihitung Hadir Kerja)!');
         } else {
             $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, check_in, status, latitude, longitude, approval_status, description, photo) VALUES (?, ?, ?, 'Kunjungan', ?, ?, 'Disetujui', ?, ?)");
             $stmt->execute([$user_id, $today, $time_now, $lat, $lng, $description, $photo]);
+            logActivity($pdo, $user_id, "Absen kunjungan dinas luar ke $instansi" . ($lat && $lng ? " ($lat, $lng)" : ""));
+            kembali('pesan', 'Absen Kunjungan Dinas Luar berhasil dicatat! Status dihitung sebagai hadir kerja aktif.');
         }
-        logActivity($pdo, $user_id, "Absen kunjungan dinas luar ke $instansi" . ($lat && $lng ? " (koordinat: $lat, $lng)" : ""));
-        kembali('pesan', 'Absen Kunjungan Dinas Luar berhasil dicatat!');
     }
 
     // ===========================================================

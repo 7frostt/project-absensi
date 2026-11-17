@@ -216,6 +216,18 @@ function modal_file($label) {
                 </div>
             </div>
 
+            <?php if ($is_karyawan): ?>
+            <div class="alert alert-primary bg-primary-subtle border-primary-subtle py-2 px-3 small rounded-3 mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <i class="fas fa-briefcase text-primary me-1.5"></i>
+                    <strong>Fitur Khusus Karyawan:</strong> Bertugas di luar kantor (kedinasan)? Absen dinas bebas batas radius GPS kantor dan <strong>tetap dihitung masuk kerja (hadir)</strong>.
+                </div>
+                <button type="button" class="btn btn-primary btn-sm fw-semibold shadow-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#modalKunjungan">
+                    <i class="fas fa-paper-plane me-1"></i><?= !empty($absen_hari_ini['check_in']) ? 'Ajukan Dinas Luar' : 'Absen Dinas Luar' ?>
+                </button>
+            </div>
+            <?php endif; ?>
+
             <!-- Attendance Workflow Actions -->
             <?php
             $has_izin_jam_desc = ($absen_hari_ini && is_izin_jam_row($absen_hari_ini));
@@ -286,26 +298,33 @@ function modal_file($label) {
 
                 <!-- Clean Permission Form Buttons -->
                 <div class="row g-2">
-                    <div class="col-6 col-md-3">
+                    <div class="<?= $is_karyawan ? 'col-6 col-md' : 'col-6 col-md-3' ?>">
                         <button type="button" class="btn btn-outline-secondary w-100 py-2 small fw-semibold d-inline-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalIzinJam">
                             <i class="fas fa-clock text-warning"></i><span>Izin Jam</span>
                         </button>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="<?= $is_karyawan ? 'col-6 col-md' : 'col-6 col-md-3' ?>">
                         <button type="button" class="btn btn-outline-secondary w-100 py-2 small fw-semibold d-inline-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalIzin">
                             <i class="fas fa-envelope text-primary"></i><span>Izin Hari</span>
                         </button>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="<?= $is_karyawan ? 'col-6 col-md' : 'col-6 col-md-3' ?>">
                         <button type="button" class="btn btn-outline-secondary w-100 py-2 small fw-semibold d-inline-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalSakit">
                             <i class="fas fa-notes-medical text-danger"></i><span>Sakit</span>
                         </button>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="<?= $is_karyawan ? 'col-6 col-md' : 'col-6 col-md-3' ?>">
                         <button type="button" class="btn btn-outline-secondary w-100 py-2 small fw-semibold d-inline-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalCuti">
                             <i class="fas fa-calendar-check text-info"></i><span>Cuti</span>
                         </button>
                     </div>
+                    <?php if ($is_karyawan): ?>
+                    <div class="col-12 col-md">
+                        <button type="button" class="btn btn-outline-primary w-100 py-2 small fw-semibold d-inline-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalKunjungan">
+                            <i class="fas fa-briefcase text-primary"></i><span>Dinas Luar</span>
+                        </button>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
             <?php else: ?>
@@ -329,7 +348,7 @@ function modal_file($label) {
                         </div>
 
                         <?php if ($absen_hari_ini['status'] === 'Kunjungan'): ?>
-                            <?php banner('info', 'briefcase', 'Status: <strong class="text-primary fs-6">Kunjungan Dinas Luar</strong> &mdash; Anda tercatat bertugas aktif di luar kantor.'); ?>
+                            <?php banner('info', 'briefcase', '<div class="d-flex align-items-center gap-2 mb-1"><span class="badge bg-primary text-white"><i class="fas fa-briefcase me-1"></i>Tugas Kedinasan Aktif</span><span class="badge bg-success text-white"><i class="fas fa-check me-1"></i>Dihitung Hadir Kerja</span></div>Status Kehadiran: <strong class="text-primary fs-6">Kunjungan Dinas Luar</strong> &mdash; Anda tercatat aktif bekerja kedinasan di luar kantor (bebas batasan radius).'); ?>
                         <?php elseif ($has_izin_jam_desc): ?>
                             <?php if ($izin_hasil === 'Terlambat'): ?>
                                 <?php banner('warning', 'exclamation-triangle', '<span class="d-block fw-bold text-uppercase" style="font-size:10px;letter-spacing:.5px;color:#b45309;">Status Kehadiran</span><strong class="fs-6">Terlambat</strong> &mdash; tiba melewati batas izin' . ($izin_sampai ? ' (' . substr($izin_sampai, 0, 5) . ')' : '') . '.'); ?>
@@ -366,7 +385,12 @@ function modal_file($label) {
                                 </form>
                             <?php else: ?>
                                 <?php banner('muted', 'lock', 'Absen pulang reguler dibuka pukul <strong class="text-dark">' . date('H:i', strtotime($jam_pulang)) . ' WIB</strong>.'); ?>
-                                <div class="text-center mt-2">
+                                <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+                                    <?php if ($is_karyawan): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalKunjungan">
+                                        <i class="fas fa-briefcase me-1"></i> <?= ($absen_hari_ini['status'] === 'Kunjungan') ? 'Perbarui Lokasi / Agenda Dinas' : 'Tugas Dinas Luar (Kedinasan)' ?>
+                                    </button>
+                                    <?php endif; ?>
                                     <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalIzinJam">
                                         <i class="fas fa-clock text-warning me-1"></i> Form Izin Jam (Pulang Awal / Keluar Sementara)
                                     </button>

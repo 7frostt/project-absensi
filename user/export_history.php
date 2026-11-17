@@ -10,23 +10,26 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] == 'Admin') {
     exit('403 Forbidden: Akses ditolak');
 }
 
-$user_id = (int)$_SESSION['user_id'];
+$user_id = (int) $_SESSION['user_id'];
 enforce_user_ownership($user_id);
 $tahun_ini = (int) date('Y');
 
 // Filter (divalidasi)
 $bulan = isset($_GET['bulan']) ? (int) $_GET['bulan'] : (int) date('n');
 $tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : $tahun_ini;
-if ($bulan < 1 || $bulan > 12) $bulan = (int) date('n');
-if ($tahun < $tahun_ini - 2 || $tahun > $tahun_ini) $tahun = $tahun_ini;
-$bulan  = sprintf('%02d', $bulan);
+if ($bulan < 1 || $bulan > 12)
+    $bulan = (int) date('n');
+if ($tahun < $tahun_ini - 2 || $tahun > $tahun_ini)
+    $tahun = $tahun_ini;
+$bulan = sprintf('%02d', $bulan);
 $format = (($_GET['format'] ?? 'excel') === 'print') ? 'print' : 'excel';
 
 // Data pengguna (hanya diri sendiri)
 $stmt_user = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt_user->execute([$user_id]);
 $u = $stmt_user->fetch();
-if (!$u) exit('Pengguna tidak ditemukan');
+if (!$u)
+    exit('Pengguna tidak ditemukan');
 
 $jumlah_hari = cal_days_in_month(CAL_GREGORIAN, (int) $bulan, $tahun);
 
@@ -39,7 +42,7 @@ $stmt_att = $pdo->prepare("SELECT *, DAY(date) AS tgl FROM attendance WHERE user
 $stmt_att->execute([$user_id, $bulan, $tahun]);
 $attendance_data = [];
 $today_ymd = date('Y-m-d');
-$tol_izin  = izin_jam_toleransi($pdo);
+$tol_izin = izin_jam_toleransi($pdo);
 
 while ($row = $stmt_att->fetch()) {
     // Aturan rekap sama dengan admin (lihat rekap_status di config/helpers.php)
@@ -50,9 +53,18 @@ while ($row = $stmt_att->fetch()) {
 }
 
 $nama_bulan = [
-    '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
-    '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
-    '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+    '01' => 'Januari',
+    '02' => 'Februari',
+    '03' => 'Maret',
+    '04' => 'April',
+    '05' => 'Mei',
+    '06' => 'Juni',
+    '07' => 'Juli',
+    '08' => 'Agustus',
+    '09' => 'September',
+    '10' => 'Oktober',
+    '11' => 'November',
+    '12' => 'Desember'
 ];
 
 // Hitung isi sel per tanggal + total
@@ -65,17 +77,27 @@ for ($d = 1; $d <= $jumlah_hari; $d++) {
     $is_libur = ($day_num == 7 || isset($holidays_raw[$tgl_str]));
     $st = $attendance_data[$d] ?? null;
 
-    if ($st == 'Hadir')                                                   $k = 'H';
-    elseif ($st == 'Terlambat')                                           $k = 'T';
-    elseif ($st == 'Kunjungan')                                           $k = 'K';
-    elseif ($st == 'Izin Jam')                                            $k = 'IJ';
-    elseif (in_array($st, ['Izin', 'Izin Hari']))                         $k = 'I';
-    elseif ($st == 'Cuti')                                                $k = 'C';
-    elseif ($st == 'Sakit')                                               $k = 'S';
-    elseif ($st == 'Alpa')                                                $k = 'A';
-    else                                                                  $k = $is_libur ? 'L' : '-';
+    if ($st == 'Hadir')
+        $k = 'H';
+    elseif ($st == 'Terlambat')
+        $k = 'T';
+    elseif ($st == 'Kunjungan')
+        $k = 'K';
+    elseif ($st == 'Izin Jam')
+        $k = 'IJ';
+    elseif (in_array($st, ['Izin', 'Izin Hari']))
+        $k = 'I';
+    elseif ($st == 'Cuti')
+        $k = 'C';
+    elseif ($st == 'Sakit')
+        $k = 'S';
+    elseif ($st == 'Alpa')
+        $k = 'A';
+    else
+        $k = $is_libur ? 'L' : '-';
 
-    if (isset($tot[$k])) $tot[$k]++;
+    if (isset($tot[$k]))
+        $tot[$k]++;
     $cells[$d] = $k;
     $libur_head[$d] = $is_libur;
 }
@@ -93,131 +115,224 @@ if ($format === 'excel') {
     header("Content-Type: application/vnd.ms-excel");
     header("Content-Disposition: attachment; filename=\"$judul_file.xls\"");
     ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed; }
-        th, td { border: 1px solid #999999; padding: 5px 2px; text-align: center; vertical-align: middle; }
-        .th-header { background-color: #f2f2f2; font-weight: bold; }
-        .bg-libur { background-color: #ef4444; color: #ffffff; font-weight: bold; }
-        .bg-h { background-color: #10b981; color: #ffffff; font-weight: bold; }
-        .bg-t { background-color: #d63384; color: #ffffff; font-weight: bold; }
-        .bg-ij { background-color: #fd7e14; color: #ffffff; font-weight: bold; }
-        .bg-k { background-color: #17a2b8; color: #ffffff; font-weight: bold; }
-        .bg-i { background-color: #0d6efd; color: #ffffff; font-weight: bold; }
-        .bg-c { background-color: #20c997; color: #ffffff; font-weight: bold; }
-        .bg-s { background-color: #6f42c1; color: #ffffff; font-weight: bold; }
-        .bg-a { background-color: #ef4444; color: #ffffff; font-weight: bold; }
-        .bg-l { background-color: #212529; color: #ffffff; font-weight: bold; }
-        .bg-dash { background-color: #64748b; color: #ffffff; font-weight: bold; }
-        .legend-cell { border: none; }
-    </style>
-</head>
-<body>
-    <div style="text-align: center; margin-bottom: 12px;">
-        <?php if ($logo_base64): ?>
-            <img src="<?= $logo_base64 ?>" height="45" alt="Logo Sukarobot" style="vertical-align: middle; margin-right: 12px;">
-        <?php endif; ?>
-        <div style="display: inline-block; vertical-align: middle; text-align: left;">
-            <h3 style="margin: 0; font-size: 14px; text-transform: uppercase;">SUKAROBOT ACADEMY &mdash; REKAP ABSENSI INDIVIDU</h3>
-            <div style="font-size: 11px; color: #333; font-weight: bold; margin-top: 2px;"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['user_type']) ?>) | PERIODE <?= strtoupper($nama_bulan[$bulan]) ?> <?= $tahun ?></div>
+    <!DOCTYPE html>
+    <html>
+
+    <head>
+        <meta charset="utf-8">
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                font-family: Arial, sans-serif;
+                font-size: 11px;
+                table-layout: fixed;
+            }
+
+            th,
+            td {
+                border: 1px solid #999999;
+                padding: 5px 2px;
+                text-align: center;
+                vertical-align: middle;
+            }
+
+            .th-header {
+                background-color: #f2f2f2;
+                font-weight: bold;
+            }
+
+            .bg-libur {
+                background-color: #ef4444;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-h {
+                background-color: #10b981;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-t {
+                background-color: #d63384;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-ij {
+                background-color: #fd7e14;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-k {
+                background-color: #17a2b8;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-i {
+                background-color: #0d6efd;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-c {
+                background-color: #20c997;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-s {
+                background-color: #6f42c1;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-a {
+                background-color: #ef4444;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-l {
+                background-color: #212529;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .bg-dash {
+                background-color: #64748b;
+                color: #ffffff;
+                font-weight: bold;
+            }
+
+            .legend-cell {
+                border: none;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div style="text-align: center; margin-bottom: 12px;">
+            <?php if ($logo_base64): ?>
+                <img src="<?= $logo_base64 ?>" height="45" alt="Logo Sukarobot"
+                    style="vertical-align: middle; margin-right: 12px;">
+            <?php endif; ?>
+            <div style="display: inline-block; vertical-align: middle; text-align: left;">
+                <h3 style="margin: 0; font-size: 14px; text-transform: uppercase;">SUKAROBOT ACADEMY &mdash; REKAP ABSENSI
+                    INDIVIDU</h3>
+                <div style="font-size: 11px; color: #333; font-weight: bold; margin-top: 2px;">
+                    <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['user_type']) ?>) | PERIODE
+                    <?= strtoupper($nama_bulan[$bulan]) ?>     <?= $tahun ?></div>
+            </div>
         </div>
-    </div>
 
-    <table>
-        <colgroup>
-            <col style="width: 35px;">   <!-- No -->
-            <col style="width: 150px;">  <!-- Nama -->
-            <col style="width: 130px;">  <!-- Sekolah / Instansi -->
-            <col style="width: 110px;">  <!-- Jurusan / Divisi -->
-            <col style="width: 70px;">   <!-- Jenis -->
-            <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
-                <col style="width: 25px;">
-            <?php endfor; ?>
-            <col style="width: 25px;"><col style="width: 25px;"><col style="width: 25px;"><col style="width: 25px;"><col style="width: 25px;"><col style="width: 25px;"><col style="width: 25px;"><col style="width: 25px;"> <!-- Total H,T,IJ,K,I,C,S,A -->
-        </colgroup>
-        <thead>
-            <tr>
-                <th rowspan="2" class="th-header">No</th>
-                <th rowspan="2" class="th-header" style="text-align: left; padding-left: 5px;">Nama</th>
-                <th rowspan="2" class="th-header" style="text-align: left; padding-left: 5px;">Sekolah / Instansi</th>
-                <th rowspan="2" class="th-header" style="text-align: left; padding-left: 5px;">Jurusan / Divisi</th>
-                <th rowspan="2" class="th-header">Jenis</th>
-                <th colspan="<?= $jumlah_hari ?>" class="th-header"><?= strtoupper($nama_bulan[$bulan]) ?></th>
-                <th colspan="8" class="th-header">Total</th>
-            </tr>
-            <tr>
+        <table>
+            <colgroup>
+                <col style="width: 35px;"> <!-- No -->
+                <col style="width: 150px;"> <!-- Nama -->
+                <col style="width: 130px;"> <!-- Sekolah / Instansi -->
+                <col style="width: 110px;"> <!-- Jurusan / Divisi -->
+                <col style="width: 70px;"> <!-- Jenis -->
                 <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
-                    <th class="<?= $libur_head[$d] ? 'bg-libur' : 'th-header' ?>"><?= $d ?></th>
+                    <col style="width: 25px;">
                 <?php endfor; ?>
-                <th class="bg-h">H</th>
-                <th class="bg-t">T</th>
-                <th class="bg-ij">I</th>
-                <th class="bg-k">K</th>
-                <th class="bg-i">I</th>
-                <th class="bg-c">C</th>
-                <th class="bg-s">S</th>
-                <th class="bg-a">A</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>1</td>
-                <td style="text-align: left; padding-left: 5px; font-weight: bold; text-transform: uppercase;"><?= strtoupper(htmlspecialchars($u['name'])) ?></td>
-                <td style="text-align: left; padding-left: 5px;"><?= htmlspecialchars($u['institution'] ?: '-') ?></td>
-                <td style="text-align: left; padding-left: 5px;"><?= htmlspecialchars($u['department'] ?: '-') ?></td>
-                <td><?= htmlspecialchars($u['user_type']) ?></td>
+                <col style="width: 25px;">
+                <col style="width: 25px;">
+                <col style="width: 25px;">
+                <col style="width: 25px;">
+                <col style="width: 25px;">
+                <col style="width: 25px;">
+                <col style="width: 25px;">
+                <col style="width: 25px;"> <!-- Total H,T,IJ,K,I,C,S,A -->
+            </colgroup>
+            <thead>
+                <tr>
+                    <th rowspan="2" class="th-header">No</th>
+                    <th rowspan="2" class="th-header" style="text-align: left; padding-left: 5px;">Nama</th>
+                    <th rowspan="2" class="th-header" style="text-align: left; padding-left: 5px;">Sekolah / Instansi</th>
+                    <th rowspan="2" class="th-header" style="text-align: left; padding-left: 5px;">Jurusan / Divisi</th>
+                    <th rowspan="2" class="th-header">Jenis</th>
+                    <th colspan="<?= $jumlah_hari ?>" class="th-header"><?= strtoupper($nama_bulan[$bulan]) ?></th>
+                    <th colspan="8" class="th-header">Total</th>
+                </tr>
+                <tr>
+                    <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
+                        <th class="<?= $libur_head[$d] ? 'bg-libur' : 'th-header' ?>"><?= $d ?></th>
+                    <?php endfor; ?>
+                    <th class="bg-h">H</th>
+                    <th class="bg-t">T</th>
+                    <th class="bg-ij">I</th>
+                    <th class="bg-k">K</th>
+                    <th class="bg-i">I</th>
+                    <th class="bg-c">C</th>
+                    <th class="bg-s">S</th>
+                    <th class="bg-a">A</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td style="text-align: left; padding-left: 5px; font-weight: bold; text-transform: uppercase;">
+                        <?= strtoupper(htmlspecialchars($u['name'])) ?></td>
+                    <td style="text-align: left; padding-left: 5px;"><?= htmlspecialchars($u['institution'] ?: '-') ?></td>
+                    <td style="text-align: left; padding-left: 5px;"><?= htmlspecialchars($u['department'] ?: '-') ?></td>
+                    <td><?= htmlspecialchars($u['user_type']) ?></td>
 
-                <?php for ($d = 1; $d <= $jumlah_hari; $d++): $k = $cells[$d]; ?>
-                    <?php if ($k === '-'): ?>
-                        <td>-</td>
-                    <?php else: ?>
-                        <td class="bg-<?= strtolower($k) ?>"><?= $k === 'IJ' ? 'I' : $k ?></td>
-                    <?php endif; ?>
-                <?php endfor; ?>
+                    <?php for ($d = 1; $d <= $jumlah_hari; $d++):
+                        $k = $cells[$d]; ?>
+                        <?php if ($k === '-'): ?>
+                            <td>-</td>
+                        <?php else: ?>
+                            <td class="bg-<?= strtolower($k) ?>"><?= $k === 'IJ' ? 'I' : $k ?></td>
+                        <?php endif; ?>
+                    <?php endfor; ?>
 
-                <td style="font-weight: bold; background-color: #E7F8F2; color: #198754;"><?= $tot['H'] ?></td>
-                <td style="font-weight: bold; background-color: #FBEBF3; color: #d63384;"><?= $tot['T'] ?></td>
-                <td style="font-weight: bold; background-color: #FFF2E8; color: #fd7e14;"><?= $tot['IJ'] ?></td>
-                <td style="font-weight: bold; background-color: #E8F6F8; color: #17a2b8;"><?= $tot['K'] ?></td>
-                <td style="font-weight: bold; background-color: #E7F1FF; color: #0d6efd;"><?= $tot['I'] ?></td>
-                <td style="font-weight: bold; background-color: #E4F9F3; color: #14a085;"><?= $tot['C'] ?></td>
-                <td style="font-weight: bold; background-color: #F1ECF9; color: #6f42c1;"><?= $tot['S'] ?></td>
-                <td style="font-weight: bold; background-color: #FDECEC; color: #dc3545;"><?= $tot['A'] ?></td>
-            </tr>
-        </tbody>
-        <tbody>
-            <tr><td colspan="5" style="border: none; height: 10px;"></td></tr>
-            <tr>
-                <td colspan="2" style="border: none; text-align: left; font-weight: bold;">Keterangan:</td>
-                <td class="bg-h">H: Hadir</td>
-                <td class="bg-t">T: Terlambat</td>
-                <td class="bg-ij">I: Izin Jam</td>
-            </tr>
-            <tr>
-                <td colspan="2" class="legend-cell"></td>
-                <td class="bg-k">K: Kunjungan</td>
-                <td class="bg-i">I: Izin</td>
-                <td class="bg-c">C: Cuti</td>
-            </tr>
-            <tr>
-                <td colspan="2" class="legend-cell"></td>
-                <td class="bg-s">S: Sakit</td>
-                <td class="bg-a">A: Alpa/Ditolak</td>
-                <td class="bg-l">L: Libur</td>
-            </tr>
-            <tr>
-                <td colspan="2" class="legend-cell"></td>
-                <td class="bg-dash" style="font-size: 10px;">-: Belum/Absen Kosong</td>
-                <td colspan="2" class="legend-cell"></td>
-            </tr>
-        </tbody>
-    </table>
-</body>
-</html>
-<?php
+                    <td style="font-weight: bold; background-color: #E7F8F2; color: #198754;"><?= $tot['H'] ?></td>
+                    <td style="font-weight: bold; background-color: #FBEBF3; color: #d63384;"><?= $tot['T'] ?></td>
+                    <td style="font-weight: bold; background-color: #FFF2E8; color: #fd7e14;"><?= $tot['IJ'] ?></td>
+                    <td style="font-weight: bold; background-color: #E8F6F8; color: #17a2b8;"><?= $tot['K'] ?></td>
+                    <td style="font-weight: bold; background-color: #E7F1FF; color: #0d6efd;"><?= $tot['I'] ?></td>
+                    <td style="font-weight: bold; background-color: #E4F9F3; color: #14a085;"><?= $tot['C'] ?></td>
+                    <td style="font-weight: bold; background-color: #F1ECF9; color: #6f42c1;"><?= $tot['S'] ?></td>
+                    <td style="font-weight: bold; background-color: #FDECEC; color: #dc3545;"><?= $tot['A'] ?></td>
+                </tr>
+            </tbody>
+            <tbody>
+                <tr>
+                    <td colspan="5" style="border: none; height: 10px;"></td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="border: none; text-align: left; font-weight: bold;">Keterangan:</td>
+                    <td class="bg-h">H: Hadir</td>
+                    <td class="bg-t">T: Terlambat</td>
+                    <td class="bg-ij">I: Izin Jam</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="legend-cell"></td>
+                    <td class="bg-k">K: Kunjungan</td>
+                    <td class="bg-i">I: Izin</td>
+                    <td class="bg-c">C: Cuti</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="legend-cell"></td>
+                    <td class="bg-s">S: Sakit</td>
+                    <td class="bg-a">A: Alpa/Ditolak</td>
+                    <td class="bg-l">L: Libur</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="legend-cell"></td>
+                    <td class="bg-dash" style="font-size: 10px;">-: Belum/Absen Kosong</td>
+                    <td colspan="2" class="legend-cell"></td>
+                </tr>
+            </tbody>
+        </table>
+    </body>
+
+    </html>
+    <?php
     exit();
 }
 
@@ -227,38 +342,165 @@ if ($format === 'excel') {
 ?>
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <title><?= htmlspecialchars($judul_file) ?></title>
     <style>
-        @page { size: A4 landscape; margin: 8mm; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9px; color: #333; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .header { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; text-align: left; }
-        .header img { height: 44px; width: auto; object-fit: contain; }
-        .header h2 { margin: 0; font-size: 14px; text-transform: uppercase; color: #0f172a; }
-        .header .sub { font-size: 11px; font-weight: bold; color: #334155; margin-top: 1px; }
-        .header p { margin: 2px 0 0 0; font-size: 9.5px; font-weight: 600; color: #64748b; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
-        th, td { border: 1px solid #444; padding: 3px 1px; text-align: center; font-size: 8.5px; overflow: hidden; }
-        th { background-color: #f0f0f0; font-weight: bold; }
-        
-        .bg-libur-head { background-color: #ef4444 !important; color: #fff !important; }
-        .bg-h { background-color: #10b981 !important; color: #fff !important; font-weight: bold; }
-        .bg-t { background-color: #d63384 !important; color: #fff !important; font-weight: bold; }
-        .bg-ij { background-color: #fd7e14 !important; color: #fff !important; font-weight: bold; }
-        .bg-k { background-color: #17a2b8 !important; color: #fff !important; font-weight: bold; }
-        .bg-i { background-color: #0d6efd !important; color: #fff !important; font-weight: bold; }
-        .bg-c { background-color: #20c997 !important; color: #fff !important; font-weight: bold; }
-        .bg-s { background-color: #6f42c1 !important; color: #fff !important; font-weight: bold; }
-        .bg-a { background-color: #ef4444 !important; color: #fff !important; font-weight: bold; }
-        .bg-l { background-color: #212529 !important; color: #fff !important; font-weight: bold; }
-        .bg-dash { background-color: #64748b !important; color: #fff !important; font-weight: bold; }
+        @page {
+            size: A4 landscape;
+            margin: 8mm;
+        }
 
-        .legend { margin-top: 10px; font-size: 8.5px; display: flex; gap: 6px; flex-wrap: wrap; }
-        .legend-item { display: inline-block; padding: 2px 5px; border-radius: 3px; font-weight: bold; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 9px;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        .header img {
+            height: 44px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            color: #0f172a;
+        }
+
+        .header .sub {
+            font-size: 11px;
+            font-weight: bold;
+            color: #334155;
+            margin-top: 1px;
+        }
+
+        .header p {
+            margin: 2px 0 0 0;
+            font-size: 9.5px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            table-layout: fixed;
+        }
+
+        th,
+        td {
+            border: 1px solid #444;
+            padding: 3px 1px;
+            text-align: center;
+            font-size: 8.5px;
+            overflow: hidden;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .bg-libur-head {
+            background-color: #ef4444 !important;
+            color: #fff !important;
+        }
+
+        .bg-h {
+            background-color: #10b981 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-t {
+            background-color: #d63384 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-ij {
+            background-color: #fd7e14 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-k {
+            background-color: #17a2b8 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-i {
+            background-color: #0d6efd !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-c {
+            background-color: #20c997 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-s {
+            background-color: #6f42c1 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-a {
+            background-color: #ef4444 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-l {
+            background-color: #212529 !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .bg-dash {
+            background-color: #64748b !important;
+            color: #fff !important;
+            font-weight: bold;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 8.5px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: inline-block;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
     </style>
 </head>
+
 <body onload="window.print()">
     <div class="header">
         <?php if ($logo_base64): ?>
@@ -266,22 +508,30 @@ if ($format === 'excel') {
         <?php endif; ?>
         <div>
             <h2>SUKAROBOT ACADEMY</h2>
-            <div class="sub">REKAP ABSENSI INDIVIDU: <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['user_type']) ?>)</div>
+            <div class="sub">REKAP ABSENSI INDIVIDU: <?= htmlspecialchars($u['name']) ?>
+                (<?= htmlspecialchars($u['user_type']) ?>)</div>
             <p>PERIODE: <?= strtoupper($nama_bulan[$bulan]) ?> <?= $tahun ?></p>
         </div>
     </div>
 
     <table>
         <colgroup>
-            <col style="width: 25px;">   <!-- No -->
-            <col style="width: 120px;">  <!-- Nama -->
-            <col style="width: 100px;">  <!-- Sekolah / Instansi -->
-            <col style="width: 90px;">   <!-- Jurusan / Divisi -->
-            <col style="width: 60px;">   <!-- Jenis -->
+            <col style="width: 25px;"> <!-- No -->
+            <col style="width: 120px;"> <!-- Nama -->
+            <col style="width: 100px;"> <!-- Sekolah / Instansi -->
+            <col style="width: 90px;"> <!-- Jurusan / Divisi -->
+            <col style="width: 60px;"> <!-- Jenis -->
             <?php for ($d = 1; $d <= $jumlah_hari; $d++): ?>
                 <col style="width: 17px;">
             <?php endfor; ?>
-            <col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"><col style="width: 19px;"> <!-- Total H,T,IJ,K,I,C,S,A -->
+            <col style="width: 19px;">
+            <col style="width: 19px;">
+            <col style="width: 19px;">
+            <col style="width: 19px;">
+            <col style="width: 19px;">
+            <col style="width: 19px;">
+            <col style="width: 19px;">
+            <col style="width: 19px;"> <!-- Total H,T,IJ,K,I,C,S,A -->
         </colgroup>
         <thead>
             <tr>
@@ -310,12 +560,14 @@ if ($format === 'excel') {
         <tbody>
             <tr>
                 <td>1</td>
-                <td style="text-align: left; padding-left: 4px; font-weight: bold; text-transform: uppercase;"><?= strtoupper(htmlspecialchars($u['name'])) ?></td>
+                <td style="text-align: left; padding-left: 4px; font-weight: bold; text-transform: uppercase;">
+                    <?= strtoupper(htmlspecialchars($u['name'])) ?></td>
                 <td style="text-align: left; padding-left: 4px;"><?= htmlspecialchars($u['institution'] ?: '-') ?></td>
                 <td style="text-align: left; padding-left: 4px;"><?= htmlspecialchars($u['department'] ?: '-') ?></td>
                 <td><?= htmlspecialchars($u['user_type']) ?></td>
 
-                <?php for ($d = 1; $d <= $jumlah_hari; $d++): $k = $cells[$d]; ?>
+                <?php for ($d = 1; $d <= $jumlah_hari; $d++):
+                    $k = $cells[$d]; ?>
                     <?php if ($k === '-'): ?>
                         <td style="color: #888;">-</td>
                     <?php else: ?>
@@ -348,4 +600,5 @@ if ($format === 'excel') {
         <span class="legend-item bg-dash">-: Belum/Absen Kosong</span>
     </div>
 </body>
+
 </html>
