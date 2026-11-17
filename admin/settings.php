@@ -172,8 +172,19 @@ $office = get_office_location($pdo);
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label small text-muted fw-semibold">Radius (meter)</label>
-                        <input type="number" name="office_radius" class="form-control" min="10" max="5000" value="<?= (int)$office['radius'] ?>" required>
+                        <input type="number" name="office_radius" id="office_radius" class="form-control" min="10" max="5000" value="<?= (int)$office['radius'] ?>" required>
                     </div>
+                </div>
+
+                <!-- VISUALISASI RADIUS PETA (LEAFLET) -->
+                <div class="mb-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-1 gap-2">
+                        <label class="small text-muted fw-semibold"><i class="fas fa-map-marked-alt text-primary me-1"></i>Visualisasi Titik Kantor &amp; Radius Absen</label>
+                        <span class="badge bg-light text-secondary border fw-normal" style="font-size: 11px;">
+                            <i class="fas fa-info-circle text-primary me-1"></i>Klik pada peta atau seret pin untuk memindahkan titik
+                        </span>
+                    </div>
+                    <div id="map-admin-settings" style="height: 320px; width: 100%; border-radius: 8px;" class="border shadow-sm"></div>
                 </div>
 
                 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
@@ -242,6 +253,80 @@ $office = get_office_location($pdo);
 </div>
 
 <script>
+let mapAdmin = null;
+let adminMarker = null;
+let adminCircle = null;
+
+function initAdminMap() {
+    const latInput = document.getElementById('office_lat');
+    const lngInput = document.getElementById('office_lng');
+    const radInput = document.getElementById('office_radius');
+    if (!latInput || !lngInput || !radInput) return;
+
+    const lat = parseFloat(latInput.value) || -6.9175;
+    const lng = parseFloat(lngInput.value) || 106.9272;
+    const rad = parseInt(radInput.value) || 100;
+
+    if (typeof L === 'undefined') {
+        setTimeout(initAdminMap, 200);
+        return;
+    }
+
+    mapAdmin = L.map('map-admin-settings').setView([lat, lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapAdmin);
+
+    adminMarker = L.marker([lat, lng], { draggable: true }).addTo(mapAdmin);
+    adminCircle = L.circle([lat, lng], {
+        radius: rad,
+        color: '#2563eb',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.18,
+        weight: 2
+    }).addTo(mapAdmin);
+
+    adminMarker.bindPopup('<b>Titik Kantor</b><br>Radius: ' + rad + ' m').openPopup();
+
+    function updateCoords(newLat, newLng) {
+        latInput.value = newLat.toFixed(7);
+        lngInput.value = newLng.toFixed(7);
+        const lnk = document.getElementById('lnk_maps');
+        if (lnk) lnk.href = 'https://www.google.com/maps?q=' + newLat.toFixed(7) + ',' + newLng.toFixed(7);
+        adminMarker.setLatLng([newLat, newLng]);
+        adminCircle.setLatLng([newLat, newLng]);
+    }
+
+    adminMarker.on('dragend', function (e) {
+        const p = e.target.getLatLng();
+        updateCoords(p.lat, p.lng);
+    });
+
+    mapAdmin.on('click', function (e) {
+        updateCoords(e.latlng.lat, e.latlng.lng);
+    });
+
+    radInput.addEventListener('input', function () {
+        const r = parseInt(this.value) || 10;
+        adminCircle.setRadius(r);
+        adminMarker.setPopupContent('<b>Titik Kantor</b><br>Radius: ' + r + ' m');
+    });
+
+    [latInput, lngInput].forEach(inp => {
+        inp.addEventListener('change', function () {
+            const curLat = parseFloat(latInput.value);
+            const curLng = parseFloat(lngInput.value);
+            if (!isNaN(curLat) && !isNaN(curLng)) {
+                updateCoords(curLat, curLng);
+                mapAdmin.setView([curLat, curLng]);
+            }
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initAdminMap);
+
 function pakaiLokasiSaya(btn) {
     const info = document.getElementById('lokasi_info');
     if (!navigator.geolocation) { info.className = 'small mt-2 text-danger'; info.textContent = 'Perangkat tidak mendukung GPS.'; return; }
@@ -249,9 +334,16 @@ function pakaiLokasiSaya(btn) {
     info.className = 'small mt-2 text-muted';
     info.textContent = 'Mengambil lokasi...';
     navigator.geolocation.getCurrentPosition(function(pos) {
-        document.getElementById('office_lat').value = pos.coords.latitude;
-        document.getElementById('office_lng').value = pos.coords.longitude;
-        document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + pos.coords.latitude + ',' + pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        document.getElementById('office_lat').value = lat.toFixed(7);
+        document.getElementById('office_lng').value = lng.toFixed(7);
+        document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+        if (adminMarker && adminCircle && mapAdmin) {
+            adminMarker.setLatLng([lat, lng]);
+            adminCircle.setLatLng([lat, lng]);
+            mapAdmin.setView([lat, lng], 16);
+        }
         info.className = 'small mt-2 text-success';
         info.textContent = 'Terisi dari lokasi Anda (akurasi ±' + Math.round(pos.coords.accuracy) + ' m). Klik Simpan Lokasi untuk menerapkan.';
         btn.disabled = false;

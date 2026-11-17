@@ -153,9 +153,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     }
 
     // ===========================================================
-    // 3. KUNJUNGAN / DINAS LUAR (Bekerja di Luar Kantor)
+    // 3. KUNJUNGAN / DINAS LUAR (Bekerja di Luar Kantor - Khusus Karyawan)
     // ===========================================================
     elseif ($action == 'kunjungan') {
+        if (($_SESSION['user_type'] ?? '') !== 'Karyawan') {
+            kembali('error', 'Fitur kunjungan dinas luar hanya diperuntukkan bagi karyawan.');
+        }
+
         if (!boleh_ajukan_baru($existing)) kembali('error', 'Anda sudah memiliki catatan absensi hari ini.');
 
         $instansi = bersihkan_keterangan($_POST['instansi_kunjungan'] ?? '');

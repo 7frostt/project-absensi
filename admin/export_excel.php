@@ -51,6 +51,9 @@ $nama_bulan = [
 
 $filename = "Rekap_Absensi_" . $nama_bulan[$bulan] . "_" . $tahun . ".xls";
 
+$logo_path = __DIR__ . '/../assets/img/logo-sukarobot.png';
+$logo_base64 = file_exists($logo_path) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logo_path)) : '';
+
 header("Content-Type: application/vnd.ms-excel");
 header("Content-Disposition: attachment; filename=\"$filename\"");
 ?>
@@ -77,8 +80,15 @@ header("Content-Disposition: attachment; filename=\"$filename\"");
     </style>
 </head>
 <body>
-    <h3 style="text-align: center; margin-bottom: 2px;">REKAP ABSENSI PKL, MAGANG & KARYAWAN</h3>
-    <p style="text-align: center; margin-top: 0;">PERIODE BULAN <?= strtoupper($nama_bulan[$bulan]) ?> TAHUN <?= $tahun ?></p>
+    <div style="text-align: center; margin-bottom: 12px;">
+        <?php if ($logo_base64): ?>
+            <img src="<?= $logo_base64 ?>" height="45" alt="Logo Sukarobot" style="vertical-align: middle; margin-right: 12px;">
+        <?php endif; ?>
+        <div style="display: inline-block; vertical-align: middle; text-align: left;">
+            <h3 style="margin: 0; font-size: 14px; text-transform: uppercase;">SUKAROBOT ACADEMY &mdash; REKAP ABSENSI</h3>
+            <div style="font-size: 11px; color: #333; font-weight: bold; margin-top: 2px;">PKL, MAGANG &amp; KARYAWAN | PERIODE <?= strtoupper($nama_bulan[$bulan]) ?> <?= $tahun ?><?= $jenis !== 'Semua' ? ' (' . htmlspecialchars($jenis) . ')' : '' ?></div>
+        </div>
+    </div>
 
     <table>
         <colgroup>

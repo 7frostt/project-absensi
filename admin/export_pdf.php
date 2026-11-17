@@ -48,6 +48,9 @@ $nama_bulan = [
     '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
     '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
 ];
+
+$logo_path = __DIR__ . '/../assets/img/logo-sukarobot.png';
+$logo_base64 = file_exists($logo_path) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logo_path)) : '';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -57,9 +60,11 @@ $nama_bulan = [
     <style>
         @page { size: A4 landscape; margin: 8mm; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9px; color: #333; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .header { text-align: center; margin-bottom: 10px; }
-        .header h2 { margin: 0; font-size: 14px; text-transform: uppercase; }
-        .header p { margin: 2px 0 0 0; font-size: 10px; font-weight: bold; color: #555; }
+        .header { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; text-align: left; }
+        .header img { height: 44px; width: auto; object-fit: contain; }
+        .header h2 { margin: 0; font-size: 14px; text-transform: uppercase; color: #0f172a; }
+        .header .sub { font-size: 11px; font-weight: bold; color: #334155; margin-top: 1px; }
+        .header p { margin: 2px 0 0 0; font-size: 9.5px; font-weight: 600; color: #64748b; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
         th, td { border: 1px solid #444; padding: 3px 1px; text-align: center; font-size: 8.5px; overflow: hidden; }
@@ -83,8 +88,14 @@ $nama_bulan = [
 </head>
 <body onload="window.print()">
     <div class="header">
-        <h2>REKAP ABSENSI PKL, MAGANG & KARYAWAN</h2>
-        <p>PERIODE BULAN <?= strtoupper($nama_bulan[$bulan]) ?> TAHUN <?= $tahun ?></p>
+        <?php if ($logo_base64): ?>
+            <img src="<?= $logo_base64 ?>" alt="Logo Sukarobot">
+        <?php endif; ?>
+        <div>
+            <h2>SUKAROBOT ACADEMY</h2>
+            <div class="sub">REKAP ABSENSI PKL, MAGANG &amp; KARYAWAN</div>
+            <p>PERIODE: <?= strtoupper($nama_bulan[$bulan]) ?> <?= $tahun ?><?= $jenis !== 'Semua' ? ' &bull; KATEGORI: ' . strtoupper(htmlspecialchars($jenis)) : '' ?></p>
+        </div>
     </div>
 
     <table>

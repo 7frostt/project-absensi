@@ -57,12 +57,13 @@ if ($libur_nasional) {
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch();
+$is_karyawan = (($user['user_type'] ?? '') === 'Karyawan');
 
 $stmt_absen = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?");
 $stmt_absen->execute([$user_id, $today]);
 $absen_hari_ini = $stmt_absen->fetch();
 
-// 3. HUKUMAN PUSH-UP & PENILAIAN IZIN JAM
+// 3. PENILAIAN TERLAMBAT & IZIN JAM
 $menit_terlambat = 0;
 $izin_hasil      = null;
 $izin_sampai     = null;
@@ -111,19 +112,18 @@ function banner($tone, $icon, $html) {
 function modal_start($id, $title, $icon, $color, $action) {
     echo '<div class="modal fade" id="' . $id . '" tabindex="-1" aria-hidden="true">'
        . '<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">'
-       . '<div class="modal-content border shadow-sm rounded-3">'
-       . '<form action="attendance.php" method="POST" enctype="multipart/form-data" onsubmit="this.querySelector(\'[type=submit]\').disabled=true;">'
-       . '<div class="modal-header border-bottom py-3 px-4">'
+       . '<form action="attendance.php" method="POST" enctype="multipart/form-data" class="modal-content border shadow rounded-3" style="max-height: 90vh;" onsubmit="this.querySelector(\'[type=submit]\').disabled=true;">'
+       . '<div class="modal-header border-bottom py-3 px-4 flex-shrink-0 bg-white">'
        . '<h5 class="modal-title fw-bold text-dark"><i class="fas fa-' . $icon . ' me-2" style="color:' . $color . ';"></i>' . $title . '</h5>'
        . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>'
-       . '<div class="modal-body p-4 text-start"><input type="hidden" name="action" value="' . $action . '">';
+       . '<div class="modal-body p-4 text-start" style="overflow-y: auto; flex: 1 1 auto; -webkit-overflow-scrolling: touch;"><input type="hidden" name="action" value="' . $action . '">';
 }
 
 function modal_end($color, $label = 'Kirim Pengajuan') {
-    echo '</div><div class="modal-footer border-top py-3 px-4">'
-       . '<button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Batal</button>'
-       . '<button type="submit" class="btn text-white px-4 shadow-sm" style="background-color:' . $color . ';">' . $label . '</button>'
-       . '</div></form></div></div></div>';
+    echo '</div><div class="modal-footer border-top py-3 px-4 flex-shrink-0 bg-white d-flex justify-content-end gap-2">'
+       . '<button type="button" class="btn btn-outline-secondary px-4 fw-semibold" data-bs-dismiss="modal">Batal</button>'
+       . '<button type="submit" class="btn text-white px-4 shadow-sm fw-semibold" style="background-color:' . $color . ';"><i class="fas fa-paper-plane me-1.5"></i>' . $label . '</button>'
+       . '</div></form></div></div>';
 }
 
 function modal_alasan($placeholder) {
@@ -258,12 +258,12 @@ function modal_file($label) {
                 <?php endif; ?>
 
                 <?php if ($is_off == 1): ?>
-                    <?php banner('warning', 'info-circle', htmlspecialchars($ket_libur) . '. Gunakan tombol di bawah jika Anda bertugas kunjungan dinas luar.'); ?>
+                    <?php banner('warning', 'info-circle', htmlspecialchars($ket_libur) . ($is_karyawan ? '. Gunakan tombol di bawah jika Anda bertugas kunjungan dinas luar.' : '.')); ?>
                 <?php endif; ?>
 
                 <!-- TOMBOL UTAMA ABSENSI (Hadir Kantor & Kunjungan Dinas) -->
                 <div class="row g-2 mb-3">
-                    <div class="col-12 col-md-7">
+                    <div class="<?= $is_karyawan ? 'col-12 col-md-7' : 'col-12' ?>">
                         <form action="attendance.php" method="POST" id="form-hadir" class="m-0">
                             <input type="hidden" name="action" value="hadir">
                             <input type="hidden" name="latitude" id="latitude">
@@ -274,12 +274,14 @@ function modal_file($label) {
                         </form>
                         <div id="pesan-lokasi" class="pesan-lokasi mt-1 small fw-semibold text-center"></div>
                     </div>
+                    <?php if ($is_karyawan): ?>
                     <div class="col-12 col-md-5">
                         <button type="button" class="btn btn-outline-primary btn-lg w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalKunjungan">
                             <i class="fas fa-briefcase fs-5"></i><span>Absen Kunjungan / Dinas</span>
                         </button>
-                        <small class="text-muted d-block text-center mt-1" style="font-size: 11px;">Bekerja dinas di luar kantor (bebas radius)</small>
+                        <small class="text-muted d-block text-center mt-1" style="font-size: 11px;">Khusus Karyawan &bull; Bebas radius lokasi</small>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Clean Permission Form Buttons -->
@@ -332,7 +334,7 @@ function modal_file($label) {
                             <?php if ($izin_hasil === 'Terlambat'): ?>
                                 <?php banner('warning', 'exclamation-triangle', '<span class="d-block fw-bold text-uppercase" style="font-size:10px;letter-spacing:.5px;color:#b45309;">Status Kehadiran</span><strong class="fs-6">Terlambat</strong> &mdash; tiba melewati batas izin' . ($izin_sampai ? ' (' . substr($izin_sampai, 0, 5) . ')' : '') . '.'); ?>
                                 <?php if ($menit_terlambat > 0): ?>
-                                    <?php banner('danger', 'dumbbell', 'Melewati batas izin <strong class="text-danger">' . $menit_terlambat . ' menit</strong>. Silakan <strong class="text-danger">Push-up ' . $menit_terlambat . 'x</strong>!'); ?>
+                                    <?php banner('danger', 'exclamation-circle', 'Melewati batas izin <strong class="text-danger">' . $menit_terlambat . ' menit</strong>.'); ?>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <?php banner('success', 'check-circle', '<span class="d-block text-success fw-bold text-uppercase" style="font-size:10px;letter-spacing:.5px;">Status Kehadiran</span><strong class="text-success fs-6">Izin Jam</strong> &mdash; tiba sesuai izin yang disetujui.'); ?>
@@ -340,7 +342,7 @@ function modal_file($label) {
                         <?php else: ?>
                             <?php banner('success', 'check-circle', 'Absensi hari ini tercatat: <strong class="text-success">' . htmlspecialchars($absen_hari_ini['status']) . '</strong>.'); ?>
                             <?php if ($absen_hari_ini['status'] == 'Terlambat' && $menit_terlambat > 0): ?>
-                                <?php banner('danger', 'dumbbell', 'Terlambat <strong class="text-danger">' . $menit_terlambat . ' menit</strong>. Silakan <strong class="text-danger">Push-up ' . $menit_terlambat . 'x</strong>!'); ?>
+                                <?php banner('danger', 'exclamation-circle', 'Terlambat <strong class="text-danger">' . $menit_terlambat . ' menit</strong>.'); ?>
                             <?php endif; ?>
                         <?php endif; ?>
 
@@ -365,8 +367,8 @@ function modal_file($label) {
                             <?php else: ?>
                                 <?php banner('muted', 'lock', 'Absen pulang reguler dibuka pukul <strong class="text-dark">' . date('H:i', strtotime($jam_pulang)) . ' WIB</strong>.'); ?>
                                 <div class="text-center mt-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalIzinJam">
-                                        <i class="fas fa-door-open me-1"></i> Perlu pulang lebih awal? Ajukan Izin Pulang Awal
+                                    <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalIzinJam">
+                                        <i class="fas fa-clock text-warning me-1"></i> Form Izin Jam (Pulang Awal / Keluar Sementara)
                                     </button>
                                 </div>
                             <?php endif; ?>
@@ -384,18 +386,24 @@ function modal_file($label) {
                 <?php endif; ?>
             <?php endif; ?>
 
-            <!-- Collapsible Office Map -->
+            <!-- Interactive Office Map & Radius Visualization -->
             <div class="mt-3 pt-3 border-top text-center">
-                <a class="small fw-semibold text-decoration-none text-muted" data-bs-toggle="collapse" href="#peta-kantor" role="button" aria-expanded="false" aria-controls="peta-kantor">
-                    <i class="fas fa-map-marked-alt text-primary me-1"></i>Lihat Peta Lokasi Kantor & Radius
+                <a class="small fw-semibold text-decoration-none text-primary" data-bs-toggle="collapse" href="#peta-kantor" role="button" aria-expanded="false" aria-controls="peta-kantor" id="btn-toggle-peta">
+                    <i class="fas fa-map-marked-alt me-1"></i>Lihat Peta Lokasi Kantor &amp; Lingkaran Radius Absen
                 </a>
-                <div class="collapse mt-2" id="peta-kantor">
-                    <div class="ratio ratio-21x9 rounded-2 overflow-hidden border">
-                        <iframe title="Peta lokasi kantor" loading="lazy" style="border:0;"
-                            src="https://www.openstreetmap.org/export/embed.html?bbox=<?= $office['lng'] - 0.004 ?>%2C<?= $office['lat'] - 0.003 ?>%2C<?= $office['lng'] + 0.004 ?>%2C<?= $office['lat'] + 0.003 ?>&amp;layer=mapnik&amp;marker=<?= $office['lat'] ?>%2C<?= $office['lng'] ?>"></iframe>
+                <div class="collapse mt-2 text-start" id="peta-kantor">
+                    <div class="p-2.5 bg-light border rounded-3 mb-2">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small">
+                            <span><i class="fas fa-satellite-dish text-primary me-1"></i>Radius Kantor: <strong><?= (int)$office['radius'] ?> meter</strong> (lingkaran biru)</span>
+                            <span id="label-gps-posisi" class="text-muted"><i class="fas fa-crosshairs me-1"></i>GPS Anda belum diperiksa</span>
+                        </div>
                     </div>
-                    <div class="text-end mt-1">
-                        <a href="https://www.google.com/maps?q=<?= $office['lat'] ?>,<?= $office['lng'] ?>" target="_blank" rel="noopener" class="small text-decoration-none">
+                    <div id="map-user-radius" style="height: 300px; width: 100%; border-radius: 8px;" class="border shadow-sm"></div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2 small">
+                        <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" onclick="cekLokasiSaya()">
+                            <i class="fas fa-location-arrow me-1"></i>Periksa &amp; Tampilkan Posisi Saya di Peta
+                        </button>
+                        <a href="https://www.google.com/maps?q=<?= $office['lat'] ?>,<?= $office['lng'] ?>" target="_blank" rel="noopener" class="text-muted text-decoration-none">
                             Buka di Google Maps <i class="fas fa-external-link-alt ms-1"></i>
                         </a>
                     </div>
@@ -491,74 +499,103 @@ function modal_file($label) {
 
 <!-- ================= MODAL PENGAJUAN ================= -->
 <?php
-// KUNJUNGAN / DINAS LUAR (Bekerja di luar kantor)
-modal_start('modalKunjungan', 'Absen Kunjungan / Dinas Luar', 'briefcase', '#0284c7', 'kunjungan');
-echo '<div class="alert alert-info py-2 px-3 small rounded-2 border mb-3">'
-   . '<i class="fas fa-info-circle me-1"></i> Gunakan form ini jika Anda bertugas atau bekerja dinas di luar kantor. Jarak lokasi kantor <strong>tidak dibatasi</strong>.'
-   . '</div>';
-echo '<div class="mb-3">'
-   . '<label class="form-label small text-secondary fw-semibold">Tempat / Instansi Tujuan Dinas <span class="text-danger">*</span></label>'
-   . '<input type="text" name="instansi_kunjungan" class="form-control" placeholder="Contoh: PT Mitra Solusi / Disdik Kota" required>'
-   . '</div>';
-echo '<div class="mb-3">'
-   . '<label class="form-label small text-secondary fw-semibold">Keperluan / Agenda Dinas <span class="text-danger">*</span></label>'
-   . '<textarea name="description" class="form-control" rows="3" maxlength="500" placeholder="Tuliskan keperluan kunjungan atau tugas dinas..." required></textarea>'
-   . '</div>';
-modal_file('Foto di Lokasi Kunjungan / Surat Tugas (Opsional)');
-echo '<input type="hidden" name="latitude" id="lat_kunjungan_modal">';
-echo '<input type="hidden" name="longitude" id="lng_kunjungan_modal">';
-echo '<div id="info-kunjungan-gps" class="small text-muted mt-2 mb-1"><i class="fas fa-map-marker-alt text-primary me-1"></i> Mengambil koordinat lokasi dinas...</div>';
-modal_end('#0284c7', 'Kirim Absen Kunjungan');
+// KUNJUNGAN / DINAS LUAR (Khusus Karyawan)
+if ($is_karyawan) {
+    modal_start('modalKunjungan', 'Absen Kunjungan / Dinas Luar', 'briefcase', '#0284c7', 'kunjungan');
+    echo '<div class="alert alert-info py-2 px-3 small rounded-2 border mb-3">'
+       . '<i class="fas fa-info-circle me-1"></i> Gunakan form ini jika Anda bertugas atau bekerja dinas di luar kantor. Jarak lokasi kantor <strong>tidak dibatasi</strong>.'
+       . '</div>';
+    echo '<div class="mb-3">'
+       . '<label class="form-label small text-secondary fw-semibold">Tempat / Instansi Tujuan Dinas <span class="text-danger">*</span></label>'
+       . '<input type="text" name="instansi_kunjungan" class="form-control" placeholder="Contoh: PT Mitra Solusi / Disdik Kota" required>'
+       . '</div>';
+    echo '<div class="mb-3">'
+       . '<label class="form-label small text-secondary fw-semibold">Keperluan / Agenda Dinas <span class="text-danger">*</span></label>'
+       . '<textarea name="description" class="form-control" rows="3" maxlength="500" placeholder="Tuliskan keperluan kunjungan atau tugas dinas..." required></textarea>'
+       . '</div>';
+    modal_file('Foto di Lokasi Kunjungan / Surat Tugas (Opsional)');
+    echo '<input type="hidden" name="latitude" id="lat_kunjungan_modal">';
+    echo '<input type="hidden" name="longitude" id="lng_kunjungan_modal">';
+    echo '<div id="info-kunjungan-gps" class="small text-muted mt-2 mb-1"><i class="fas fa-map-marker-alt text-primary me-1"></i> Mengambil koordinat lokasi dinas...</div>';
+    modal_end('#0284c7', 'Kirim Absen Kunjungan');
+}
 
 // IZIN JAM (Datang Siang, Pulang Awal, atau Jam Tertentu)
+$sudah_absen_masuk   = (!empty($absen_hari_ini['check_in']));
+$ij_datang_disabled  = $sudah_absen_masuk ? 'disabled' : '';
+$ij_rentang_disabled = !$sudah_absen_masuk ? 'disabled' : '';
+$ij_datang_checked   = !$sudah_absen_masuk ? 'checked' : '';
+$ij_pulang_checked   = $sudah_absen_masuk ? 'checked' : '';
+
 modal_start('modalIzinJam', 'Form Pengajuan Izin Jam', 'clock', '#d97706', 'izin_jam');
-echo '<div class="mb-3">'
-   . '<label class="form-label small text-secondary fw-semibold">Kategori Izin Jam <span class="text-danger">*</span></label>'
-   . '<div class="d-flex flex-column gap-2 p-2.5 rounded-2 border bg-light">'
-   . '  <div class="form-check">'
-   . '    <input class="form-check-input" type="radio" name="tipe_izin_jam" id="ij_datang" value="datang_siang" checked onchange="toggleIzinJamForm()">'
-   . '    <label class="form-check-label small fw-semibold" for="ij_datang">'
-   . '      <i class="fas fa-sun text-warning me-1"></i> Datang Agak Siang / Terlambat'
-   . '      <small class="text-muted d-block fw-normal">Izin tiba di kantor melewati jam masuk normal tanpa dihitung terlambat.</small>'
-   . '    </label>'
-   . '  </div>'
-   . '  <div class="form-check">'
-   . '    <input class="form-check-input" type="radio" name="tipe_izin_jam" id="ij_pulang" value="pulang_awal" onchange="toggleIzinJamForm()">'
-   . '    <label class="form-check-label small fw-semibold" for="ij_pulang">'
-   . '      <i class="fas fa-door-open text-primary me-1"></i> Pulang Lebih Awal'
-   . '      <small class="text-muted d-block fw-normal">Izin meninggalkan kantor sebelum jam operasional berakhir.</small>'
-   . '    </label>'
-   . '  </div>'
-   . '  <div class="form-check">'
-   . '    <input class="form-check-input" type="radio" name="tipe_izin_jam" id="ij_rentang" value="rentang" onchange="toggleIzinJamForm()">'
-   . '    <label class="form-check-label small fw-semibold" for="ij_rentang">'
-   . '      <i class="fas fa-clock text-secondary me-1"></i> Izin Keluar Sementara (Di Jam Kerja)'
-   . '      <small class="text-muted d-block fw-normal">Izin keluar beberapa jam di tengah jam kerja untuk keperluan mendesak.</small>'
-   . '    </label>'
-   . '  </div>'
-   . '</div>'
-   . '</div>';
+?>
+<div class="mb-3">
+    <label class="form-label small text-secondary fw-semibold">Kategori Izin Jam <span class="text-danger">*</span></label>
+    <div class="d-flex flex-column gap-2">
+        <label class="p-2.5 rounded-2 border bg-light d-flex align-items-start gap-2 <?= $ij_datang_disabled ? 'opacity-50 text-muted' : '' ?>" style="cursor: <?= $ij_datang_disabled ? 'not-allowed' : 'pointer' ?>;">
+            <input class="form-check-input mt-1" type="radio" name="tipe_izin_jam" id="ij_datang" value="datang_siang" <?= $ij_datang_checked ?> <?= $ij_datang_disabled ?> onchange="toggleIzinJamForm()">
+            <div>
+                <span class="small fw-semibold text-dark"><i class="fas fa-sun text-warning me-1"></i> Datang Agak Siang / Terlambat</span>
+                <?php if ($sudah_absen_masuk): ?>
+                    <span class="badge bg-secondary-subtle text-secondary border ms-1" style="font-size: 10px;">Sudah Absen Masuk</span>
+                <?php endif; ?>
+                <small class="text-muted d-block" style="font-size: 11px;">Izin tiba di kantor melewati jam masuk normal tanpa dihitung terlambat.</small>
+            </div>
+        </label>
 
-echo '<div class="mb-3" id="group_ij_datang">'
-   . '<label class="form-label small text-secondary fw-semibold">Perkiraan Jam Tiba di Kantor <span class="text-danger">*</span></label>'
-   . '<input type="time" name="jam_sampai_siang" id="jam_sampai_siang" class="form-control" value="09:00">'
-   . '<small class="text-muted" style="font-size: 11px;">Absen masuk sebelum jam ini tidak dihitung terlambat jika disetujui.</small>'
-   . '</div>';
+        <label class="p-2.5 rounded-2 border bg-light d-flex align-items-start gap-2" style="cursor: pointer;">
+            <input class="form-check-input mt-1" type="radio" name="tipe_izin_jam" id="ij_pulang" value="pulang_awal" <?= $ij_pulang_checked ?> onchange="toggleIzinJamForm()">
+            <div>
+                <span class="small fw-semibold text-dark"><i class="fas fa-door-open text-primary me-1"></i> Pulang Lebih Awal</span>
+                <small class="text-muted d-block" style="font-size: 11px;">Izin meninggalkan kantor sebelum jam operasional berakhir.</small>
+            </div>
+        </label>
 
-echo '<div class="mb-3 d-none" id="group_ij_pulang">'
-   . '<label class="form-label small text-secondary fw-semibold">Jam Izin Pulang <span class="text-danger">*</span></label>'
-   . '<input type="time" name="jam_mulai_pulang" id="jam_mulai_pulang" class="form-control" value="14:00">'
-   . '<small class="text-muted" style="font-size: 11px;">Absen pulang akan dibuka mulai dari jam ini jika disetujui.</small>'
-   . '</div>';
+        <label class="p-2.5 rounded-2 border bg-light d-flex align-items-start gap-2 <?= $ij_rentang_disabled ? 'opacity-50 text-muted' : '' ?>" style="cursor: <?= $ij_rentang_disabled ? 'not-allowed' : 'pointer' ?>;">
+            <input class="form-check-input mt-1" type="radio" name="tipe_izin_jam" id="ij_rentang" value="rentang" <?= $ij_rentang_disabled ?> onchange="toggleIzinJamForm()">
+            <div>
+                <span class="small fw-semibold text-dark"><i class="fas fa-clock text-secondary me-1"></i> Izin Keluar Sementara (Di Jam Kerja)</span>
+                <?php if (!$sudah_absen_masuk): ?>
+                    <span class="badge bg-secondary-subtle text-secondary border ms-1" style="font-size: 10px;">Hanya Jika Sudah Absen Masuk</span>
+                <?php endif; ?>
+                <small class="text-muted d-block" style="font-size: 11px;">Izin keluar beberapa jam di tengah jam kerja untuk keperluan mendesak.</small>
+            </div>
+        </label>
+    </div>
+</div>
 
-echo '<div class="row g-2 mb-3 d-none" id="group_ij_rentang">'
-   . '<div class="col-6"><label class="form-label small text-secondary fw-semibold">Dari Jam <span class="text-danger">*</span></label><input type="time" name="jam_mulai_rentang" id="jam_mulai_rentang" class="form-control" value="10:00"></div>'
-   . '<div class="col-6"><label class="form-label small text-secondary fw-semibold">Sampai Jam <span class="text-danger">*</span></label><input type="time" name="jam_sampai_rentang" id="jam_sampai_rentang" class="form-control" value="12:00"></div>'
-   . '</div>';
+<div class="mb-3 <?= $ij_datang_checked ? '' : 'd-none' ?>" id="group_ij_datang">
+    <label class="form-label small text-secondary fw-semibold">Perkiraan Jam Tiba di Kantor <span class="text-danger">*</span></label>
+    <div class="input-group">
+        <span class="input-group-text bg-white"><i class="fas fa-clock text-muted"></i></span>
+        <input type="time" name="jam_sampai_siang" id="jam_sampai_siang" class="form-control" value="09:00">
+    </div>
+    <small class="text-muted" style="font-size: 11px;">Absen masuk sebelum jam ini tidak dihitung terlambat jika disetujui.</small>
+</div>
 
+<div class="mb-3 <?= $ij_pulang_checked ? '' : 'd-none' ?>" id="group_ij_pulang">
+    <label class="form-label small text-secondary fw-semibold">Jam Izin Pulang <span class="text-danger">*</span></label>
+    <div class="input-group">
+        <span class="input-group-text bg-white"><i class="fas fa-door-open text-muted"></i></span>
+        <input type="time" name="jam_mulai_pulang" id="jam_mulai_pulang" class="form-control" value="14:00">
+    </div>
+    <small class="text-muted" style="font-size: 11px;">Absen pulang akan dibuka mulai dari jam ini jika disetujui.</small>
+</div>
+
+<div class="row g-2 mb-3 d-none" id="group_ij_rentang">
+    <div class="col-6">
+        <label class="form-label small text-secondary fw-semibold">Dari Jam <span class="text-danger">*</span></label>
+        <input type="time" name="jam_mulai_rentang" id="jam_mulai_rentang" class="form-control" value="10:00">
+    </div>
+    <div class="col-6">
+        <label class="form-label small text-secondary fw-semibold">Sampai Jam <span class="text-danger">*</span></label>
+        <input type="time" name="jam_sampai_rentang" id="jam_sampai_rentang" class="form-control" value="12:00">
+    </div>
+</div>
+<?php
 modal_alasan('Tuliskan alasan permohonan izin jam...');
 modal_file('Upload Bukti (Opsional)');
-modal_end('#d97706');
+modal_end('#d97706', 'Kirim Pengajuan Izin Jam');
 
 // IZIN HARI (1 Hari Penuh atau Rentang Tanggal)
 modal_start('modalIzin', 'Form Izin Hari', 'envelope', '#2563eb', 'izin_hari');
@@ -660,6 +697,7 @@ function absenDenganLokasi(formId, btnId, pesanId, latId, lngId) {
 
     function suksesPosisi(pos) {
         const jarak = hitungJarak(pos.coords.latitude, pos.coords.longitude, OFFICE.lat, OFFICE.lng);
+        plotPosisiUserDiPeta(pos.coords.latitude, pos.coords.longitude);
         if (jarak > OFFICE.radius) {
             btn.disabled = false;
             tampilPesan(pesan, 'Anda berada ' + Math.round(jarak) + ' m dari kantor (maks. ' + OFFICE.radius + ' m). Absen gagal karena berada di luar area kantor.', 'text-danger');
@@ -698,24 +736,114 @@ function absenDenganLokasi(formId, btnId, pesanId, latId, lngId) {
 function absenHadir() { absenDenganLokasi('form-hadir', 'btn-hadir', 'pesan-lokasi', 'latitude', 'longitude'); }
 function absenKunjungan() { absenDenganLokasi('form-kunjungan', 'btn-kunjungan', 'pesan-lokasi-kunjungan', 'latitude_kunjungan', 'longitude_kunjungan'); }
 
+// Leaflet Map & Radius Visualization
+let mapUser = null;
+let markerKantorUser = null;
+let circleRadiusUser = null;
+let markerPosisiUser = null;
+let lineJarakUser = null;
+
+function initUserMap() {
+    const el = document.getElementById('map-user-radius');
+    if (!el || mapUser) return;
+    if (typeof L === 'undefined') {
+        setTimeout(initUserMap, 200);
+        return;
+    }
+
+    mapUser = L.map('map-user-radius').setView([OFFICE.lat, OFFICE.lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapUser);
+
+    markerKantorUser = L.marker([OFFICE.lat, OFFICE.lng]).addTo(mapUser)
+        .bindPopup('<b>Kantor Pusat Sukarobot</b><br>Radius absen: ' + OFFICE.radius + ' meter').openPopup();
+
+    circleRadiusUser = L.circle([OFFICE.lat, OFFICE.lng], {
+        radius: OFFICE.radius,
+        color: '#2563eb',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.18,
+        weight: 2
+    }).addTo(mapUser);
+}
+
+function plotPosisiUserDiPeta(userLat, userLng) {
+    const petaCollapse = document.getElementById('peta-kantor');
+    if (petaCollapse && !petaCollapse.classList.contains('show') && typeof bootstrap !== 'undefined') {
+        new bootstrap.Collapse(petaCollapse, { toggle: true });
+    }
+
+    if (!mapUser) initUserMap();
+
+    setTimeout(function() {
+        if (!mapUser) return;
+        mapUser.invalidateSize();
+
+        const jarak = Math.round(hitungJarak(userLat, userLng, OFFICE.lat, OFFICE.lng));
+        const ok = (jarak <= OFFICE.radius || IS_MAINTENANCE);
+
+        if (markerPosisiUser) mapUser.removeLayer(markerPosisiUser);
+        if (lineJarakUser) mapUser.removeLayer(lineJarakUser);
+
+        markerPosisiUser = L.circleMarker([userLat, userLng], {
+            radius: 9,
+            color: ok ? '#15803d' : '#b91c1c',
+            fillColor: ok ? '#22c55e' : '#ef4444',
+            fillOpacity: 0.95,
+            weight: 2
+        }).addTo(mapUser);
+
+        markerPosisiUser.bindPopup('<b>Posisi Anda Saat Ini</b><br>Jarak: ' + jarak + ' m dari kantor<br>' + 
+            (ok ? '<span class="text-success fw-bold">✓ DALAM RADIUS</span>' : '<span class="text-danger fw-bold">✗ DI LUAR RADIUS</span>')
+        ).openPopup();
+
+        lineJarakUser = L.polyline([[OFFICE.lat, OFFICE.lng], [userLat, userLng]], {
+            color: ok ? '#16a34a' : '#dc2626',
+            weight: 2,
+            dashArray: '5, 8'
+        }).addTo(mapUser);
+
+        const bounds = L.latLngBounds([[OFFICE.lat, OFFICE.lng], [userLat, userLng]]);
+        mapUser.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+
+        const lbl = document.getElementById('label-gps-posisi');
+        if (lbl) {
+            lbl.innerHTML = ok ? 
+                '<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Posisi Dalam Radius (' + jarak + ' m)</span>' :
+                '<span class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i>Posisi Di Luar Radius (' + jarak + ' m)</span>';
+        }
+    }, 300);
+}
+
+document.getElementById('peta-kantor')?.addEventListener('shown.bs.collapse', function () {
+    if (!mapUser) {
+        initUserMap();
+    } else {
+        mapUser.invalidateSize();
+    }
+});
+
 // Tombol "Cek Jarak GPS Saya"
 function cekLokasiSaya() {
     const out = document.getElementById('status-lokasi');
     const btn = document.getElementById('btn-cek-lokasi');
     if (!navigator.geolocation) { tampilPesan(out, 'Perangkat tidak mendukung GPS.', 'text-danger'); return; }
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     tampilPesan(out, 'Mengambil koordinat lokasi...', 'text-muted');
 
     function suksesCek(pos) {
         const jarak = Math.round(hitungJarak(pos.coords.latitude, pos.coords.longitude, OFFICE.lat, OFFICE.lng));
-        const ok = jarak <= OFFICE.radius;
+        const ok = jarak <= OFFICE.radius || IS_MAINTENANCE;
         tampilPesan(out, (ok ? '✓ Anda dalam jangkauan' : '✗ Di luar jangkauan') + ' (' + jarak + ' m dari kantor, maks ' + OFFICE.radius + ' m).', ok ? 'text-success' : 'text-danger');
-        btn.disabled = false;
+        if (btn) btn.disabled = false;
+        plotPosisiUserDiPeta(pos.coords.latitude, pos.coords.longitude);
     }
 
     function gagalCek(err) {
         tampilPesan(out, pesanGpsError(err), 'text-danger');
-        btn.disabled = false;
+        if (btn) btn.disabled = false;
     }
 
     navigator.geolocation.getCurrentPosition(
@@ -762,6 +890,12 @@ function toggleIzinHariForm() {
     if (gSehari) gSehari.classList.toggle('d-none', !elSehari.checked);
     if (gRentang) gRentang.classList.toggle('d-none', elSehari.checked);
 }
+
+// Sinkron form toggle saat halaman dimuat
+document.addEventListener('DOMContentLoaded', function () {
+    toggleIzinJamForm();
+    toggleIzinHariForm();
+});
 
 // Siapkan GPS otomatis saat modal Kunjungan dibuka
 const modalKunjunganEl = document.getElementById('modalKunjungan');

@@ -59,8 +59,33 @@ $nama_bulan = [
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h4 class="fw-bold mb-1"><i class="fas fa-file-alt text-primary me-2"></i>Rekap Absensi Bulanan (Harian)</h4>
+            <small class="text-muted">Pemisahan data absensi per kategori: Siswa PKL, Mahasiswa Magang, dan Karyawan</small>
         </div>
     </div>
+
+    <!-- TABS PEMISAH KATEGORI: SEMUA, SISWA PKL, MAHASISWA MAGANG, KARYAWAN -->
+    <ul class="nav nav-pills mb-3 gap-2 flex-wrap">
+        <li class="nav-item">
+            <a class="nav-link <?= $jenis === 'Semua' ? 'active' : 'bg-white text-secondary border shadow-sm' ?>" href="reports.php?bulan=<?= $bulan ?>&tahun=<?= $tahun ?>&jenis=Semua">
+                <i class="fas fa-users me-1.5"></i>Semua Kategori
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $jenis === 'Siswa PKL' ? 'active' : 'bg-white text-secondary border shadow-sm' ?>" href="reports.php?bulan=<?= $bulan ?>&tahun=<?= $tahun ?>&jenis=Siswa+PKL">
+                <i class="fas fa-graduation-cap me-1.5"></i>Siswa PKL
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $jenis === 'Mahasiswa Magang' ? 'active' : 'bg-white text-secondary border shadow-sm' ?>" href="reports.php?bulan=<?= $bulan ?>&tahun=<?= $tahun ?>&jenis=Mahasiswa+Magang">
+                <i class="fas fa-user-graduate me-1.5"></i>Mahasiswa Magang
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $jenis === 'Karyawan' ? 'active' : 'bg-white text-secondary border shadow-sm' ?>" href="reports.php?bulan=<?= $bulan ?>&tahun=<?= $tahun ?>&jenis=Karyawan">
+                <i class="fas fa-briefcase me-1.5"></i>Karyawan
+            </a>
+        </li>
+    </ul>
 
     <!-- FILTER & EXPORT -->
     <div class="card border-0 shadow-sm rounded-3 mb-4">

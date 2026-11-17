@@ -62,9 +62,10 @@ if (isset($_POST['action_edit'])) {
 }
 
 // LOGIKA FILTER
-$filter_bulan  = $_GET['bulan'] ?? date('m');
-$filter_tahun  = $_GET['tahun'] ?? date('Y');
-$filter_status = $_GET['status'] ?? '';
+$filter_bulan     = $_GET['bulan'] ?? date('m');
+$filter_tahun     = $_GET['tahun'] ?? date('Y');
+$filter_status    = $_GET['status'] ?? '';
+$filter_user_type = $_GET['user_type'] ?? '';
 
 // PERBAIKAN: Hanya tampilkan data yang benar-benar 'Disetujui' ATAU status normal (Hadir, Terlambat, Kunjungan, Alpa) 
 // Serta pastikan status 'Pending' / 'Menunggu Persetujuan' TIDAK IKUT TAMPIL
@@ -86,6 +87,11 @@ if (!empty($filter_status)) {
         $where_clauses[] = "a.status = ?";
         $params[] = $filter_status;
     }
+}
+
+if (!empty($filter_user_type) && in_array($filter_user_type, ['Siswa PKL', 'Mahasiswa Magang', 'Karyawan'], true)) {
+    $where_clauses[] = "u.user_type = ?";
+    $params[] = $filter_user_type;
 }
 
 $where_sql = implode(" AND ", $where_clauses);
@@ -138,7 +144,10 @@ $nama_bulan = [
 <div class="container pb-5 flex-grow-1">
     <!-- HEADER BAR: TITLE -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-        <h4 class="fw-bold m-0"><i class="fas fa-calendar-check text-primary me-2"></i>Data Absensi Siswa</h4>
+        <div>
+            <h4 class="fw-bold m-0"><i class="fas fa-calendar-check text-primary me-2"></i>Riwayat &amp; Data Absensi</h4>
+            <small class="text-muted">Pantau riwayat kehadiran berdasarkan kategori Siswa PKL, Mahasiswa Magang, dan Karyawan</small>
+        </div>
     </div>
 
     <!-- ALERT PESAN -->
@@ -157,8 +166,35 @@ $nama_bulan = [
 
     <div class="card shadow-sm border-0 rounded-3">
         <div class="card-body p-4">
+            <!-- TABS PEMISAH KATEGORI: SEMUA, SISWA PKL, MAHASISWA MAGANG, KARYAWAN -->
+            <ul class="nav nav-pills mb-4 border-bottom pb-3 gap-2 flex-wrap">
+                <li class="nav-item">
+                    <a class="nav-link <?= empty($filter_user_type) ? 'active' : 'bg-light text-secondary border' ?>" href="attendance.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&status=<?= urlencode($filter_status) ?>">
+                        <i class="fas fa-users me-1.5"></i>Semua Kategori
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $filter_user_type === 'Siswa PKL' ? 'active' : 'bg-light text-secondary border' ?>" href="attendance.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&status=<?= urlencode($filter_status) ?>&user_type=Siswa+PKL">
+                        <i class="fas fa-graduation-cap me-1.5"></i>Siswa PKL
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $filter_user_type === 'Mahasiswa Magang' ? 'active' : 'bg-light text-secondary border' ?>" href="attendance.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&status=<?= urlencode($filter_status) ?>&user_type=Mahasiswa+Magang">
+                        <i class="fas fa-user-graduate me-1.5"></i>Mahasiswa Magang
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $filter_user_type === 'Karyawan' ? 'active' : 'bg-light text-secondary border' ?>" href="attendance.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&status=<?= urlencode($filter_status) ?>&user_type=Karyawan">
+                        <i class="fas fa-briefcase me-1.5"></i>Karyawan
+                    </a>
+                </li>
+            </ul>
+
             <!-- PANEL FILTER -->
             <form method="GET" action="attendance.php" class="row g-2 mb-4 align-items-center">
+                <?php if (!empty($filter_user_type)): ?>
+                    <input type="hidden" name="user_type" value="<?= htmlspecialchars($filter_user_type) ?>">
+                <?php endif; ?>
                 <div class="col-lg-3 col-md-3 col-12">
                     <select name="bulan" class="form-select">
                         <?php foreach($nama_bulan as $k => $v): ?>

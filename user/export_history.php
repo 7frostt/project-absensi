@@ -83,6 +83,9 @@ for ($d = 1; $d <= $jumlah_hari; $d++) {
 $nama_file = trim(preg_replace('/[^A-Za-z0-9]+/', '_', $u['name']), '_');
 $judul_file = "Rekap_Absensi_" . $nama_file . "_" . $nama_bulan[$bulan] . "_" . $tahun;
 
+$logo_path = __DIR__ . '/../assets/img/logo-sukarobot.png';
+$logo_base64 = file_exists($logo_path) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logo_path)) : '';
+
 // ======================================================================
 // EXCEL
 // ======================================================================
@@ -113,8 +116,15 @@ if ($format === 'excel') {
     </style>
 </head>
 <body>
-    <h3 style="text-align: center; margin-bottom: 2px;">REKAP ABSENSI PKL, MAGANG &amp; KARYAWAN</h3>
-    <p style="text-align: center; margin-top: 0;">PERIODE BULAN <?= strtoupper($nama_bulan[$bulan]) ?> TAHUN <?= $tahun ?></p>
+    <div style="text-align: center; margin-bottom: 12px;">
+        <?php if ($logo_base64): ?>
+            <img src="<?= $logo_base64 ?>" height="45" alt="Logo Sukarobot" style="vertical-align: middle; margin-right: 12px;">
+        <?php endif; ?>
+        <div style="display: inline-block; vertical-align: middle; text-align: left;">
+            <h3 style="margin: 0; font-size: 14px; text-transform: uppercase;">SUKAROBOT ACADEMY &mdash; REKAP ABSENSI INDIVIDU</h3>
+            <div style="font-size: 11px; color: #333; font-weight: bold; margin-top: 2px;"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['user_type']) ?>) | PERIODE <?= strtoupper($nama_bulan[$bulan]) ?> <?= $tahun ?></div>
+        </div>
+    </div>
 
     <table>
         <colgroup>
@@ -223,9 +233,11 @@ if ($format === 'excel') {
     <style>
         @page { size: A4 landscape; margin: 8mm; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9px; color: #333; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .header { text-align: center; margin-bottom: 10px; }
-        .header h2 { margin: 0; font-size: 14px; text-transform: uppercase; }
-        .header p { margin: 2px 0 0 0; font-size: 10px; font-weight: bold; color: #555; }
+        .header { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; text-align: left; }
+        .header img { height: 44px; width: auto; object-fit: contain; }
+        .header h2 { margin: 0; font-size: 14px; text-transform: uppercase; color: #0f172a; }
+        .header .sub { font-size: 11px; font-weight: bold; color: #334155; margin-top: 1px; }
+        .header p { margin: 2px 0 0 0; font-size: 9.5px; font-weight: 600; color: #64748b; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
         th, td { border: 1px solid #444; padding: 3px 1px; text-align: center; font-size: 8.5px; overflow: hidden; }
@@ -249,8 +261,14 @@ if ($format === 'excel') {
 </head>
 <body onload="window.print()">
     <div class="header">
-        <h2>REKAP ABSENSI PKL, MAGANG &amp; KARYAWAN</h2>
-        <p>PERIODE BULAN <?= strtoupper($nama_bulan[$bulan]) ?> TAHUN <?= $tahun ?></p>
+        <?php if ($logo_base64): ?>
+            <img src="<?= $logo_base64 ?>" alt="Logo Sukarobot">
+        <?php endif; ?>
+        <div>
+            <h2>SUKAROBOT ACADEMY</h2>
+            <div class="sub">REKAP ABSENSI INDIVIDU: <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['user_type']) ?>)</div>
+            <p>PERIODE: <?= strtoupper($nama_bulan[$bulan]) ?> <?= $tahun ?></p>
+        </div>
     </div>
 
     <table>
